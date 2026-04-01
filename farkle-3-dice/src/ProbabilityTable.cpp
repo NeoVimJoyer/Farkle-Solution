@@ -48,6 +48,7 @@ struct roll ProbabilityTable::scoreRoll(std::vector<int> pastRolls) {
       toReturn.roll = pastRolls[0] * 100;
 
     toReturn.diceNum = 3;
+    toReturn.roll /= 50;
     return toReturn;
   }
 
@@ -59,14 +60,29 @@ struct roll ProbabilityTable::scoreRoll(std::vector<int> pastRolls) {
       toReturn.roll += 50;
       ++toReturn.diceNum;
     }
+
+  toReturn.roll /= 50;
   return toReturn;
+}
+
+struct roll ProbabilityTable::getRollScore(std::vector<int>& pastRolls) {
+  struct roll toAdd;
+  if(pastRolls.size() == 1)
+    toAdd = oneDie[pastRolls[0]];
+  else if(pastRolls.size() == 2)
+    toAdd = twoDice[pastRolls[0]][pastRolls[1]];
+  else
+    toAdd = threeDice[pastRolls[0]][pastRolls[1]][pastRolls[2]];
+  return toAdd;
 }
 
 void ProbabilityTable::getRoll(std::vector<struct roll>& rollValues, std::vector<int>& pastRolls, int d) {
   if(d == 0) {
     for(int i = 1; i <= 6; i++) {
       pastRolls.push_back(i);
-      struct roll toAdd = scoreRoll(pastRolls); toAdd.roll /= 50;
+
+      struct roll toAdd = getRollScore(pastRolls);
+
       rollValues.push_back(toAdd);
       pastRolls.pop_back();
     }
@@ -80,22 +96,58 @@ void ProbabilityTable::getRoll(std::vector<struct roll>& rollValues, std::vector
 }
 
 float ProbabilityTable::getRollPossabilities(float P[goal / 50][goal / 50][goal / 50 ][diceNum], int i, int j, int k, int d) {
-  int possabilityCount = pow(6, d + 1);
-  std::vector<struct roll> rollValues;
-  std::vector<int> pastRolls;
-  getRoll(rollValues, pastRolls, d);
-  
+  int possabilityCount = rollOutcomes[d].size();
   float total = 0;
-  for(int f = 0; f < rollValues.size(); f++) {
-    if(rollValues[f].roll == 0)
+
+  for(int f = 0; f < possabilityCount; f++) {
+    if(rollOutcomes[d][f].roll == 0)
       total += 1 - P[j][i][0][diceNum - 1];
     else
-      total += lookup(P, i, j, k + rollValues[f].roll, normalize(d - rollValues[f].diceNum));
+      total += lookup(P, i, j, k + rollOutcomes[d][f].roll, normalize(d - rollOutcomes[d][f].diceNum));
   }
+
   return total / possabilityCount;
 }
 
 ProbabilityTable::ProbabilityTable() {
+  // First get all the roll scores
+  std::vector<int> pastRolls;
+  for(int i = 1; i <= 6; i++) {
+    pastRolls.push_back(i);
+    oneDie[i] = scoreRoll(pastRolls);
+    pastRolls.pop_back();
+  }
+
+  for(int i = 1; i <= 6; i++) {
+    pastRolls.push_back(i);
+    for(int j = 1; j <= 6; j++) {
+      pastRolls.push_back(j);
+      twoDice[i][j] = scoreRoll(pastRolls);
+      pastRolls.pop_back();
+    }
+    pastRolls.pop_back();
+  }
+
+  for(int i = 1; i <= 6; i++) {
+    pastRolls.push_back(i);
+    for(int j = 1; j <= 6; j++) {
+      pastRolls.push_back(j);
+      for(int k = 1; k <= 6; k++) {
+        pastRolls.push_back(k);
+        threeDice[i][j][k] = scoreRoll(pastRolls);
+        pastRolls.pop_back();
+      }
+      pastRolls.pop_back();
+    }
+    pastRolls.pop_back();
+  }
+
+  // Then Compute roll outcomes
+  for(int d = 0; d < diceNum; d++) {
+    std::vector<int> pastRolls;
+    getRoll(rollOutcomes[d], pastRolls, d);
+  }
+
   // Every possability  i, j, k  and set it at 0.5(this is arbitrary)
   for(int i = 0; i < goal / 50; i++)
     for(int j = 0; j < goal / 50; j++)

@@ -17,10 +17,21 @@ private:
   float P[goal / 50][goal / 50][goal / 50][diceNum];
   float old[goal / 50][goal / 50][goal / 50][diceNum];
 
+  // Precomputed roll outcomes
+  std::vector<struct roll> rollOutcomes[diceNum];
+
+  // These are the scores for
+  // Waste index 0 as all the functions use 1-7
+  struct roll oneDie[7];
+  struct roll twoDice[7][7];
+  struct roll threeDice[7][7][7];
+  struct roll getRollScore(std::vector<int>& pastRolls);
+  struct roll scoreRoll(std::vector<int> pastRolls);
+
   float max(float a, float b);
   float lookup(float P[goal / 50][goal / 50][goal / 50][diceNum], int i, int j, int k, int d);
   int normalize(int num);
-  struct roll scoreRoll(std::vector<int> pastRolls);
+
   void getRoll(std::vector<struct roll>& rollValues, std::vector<int>& pastRolls, int d);
   float getRollPossabilities(float P[goal / 50][goal / 50][goal / 50][diceNum], int i, int j, int k, int d);
 
