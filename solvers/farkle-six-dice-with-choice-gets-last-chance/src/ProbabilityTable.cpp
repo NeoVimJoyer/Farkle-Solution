@@ -270,7 +270,7 @@ ProbabilityTable::ProbabilityTable() {
     ChanceTable table(i * 50);
     for(int j = 0; j < diceNum; j++) {
       chanceOfReachingAValue[i][j] = table.getProbability(j + 1);
-      std::cout << "Score: " << i << " | Starting Dice: " << j << '\n';
+      std::cout << "Score: " << i * 50 << " | Starting Dice: " << j << '\n';
     }
   }
   std::cout << '\n';
