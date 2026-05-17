@@ -1,62 +1,26 @@
 #include <endian.h>
 #include <math.h>
-#include "ProbabilityTable.h"
+#include "ChanceTable.h"
 #include <vector>
 
-float ProbabilityTable::getProbability(int i, int j, int k, int d) {
-  return P[i][j][k][d];
+float ChanceTable::getProbability(int startingDice) {
+  return P[0][startingDice - 1]; // This just gives the probability of reaching the goal with a given starting amount of dice
 }
 
-bool ProbabilityTable::getOptimalChoice(int i, int j, int k, int d) {
-  float PHold;
-  if(j >= goal / 50) {
-    if (i + k > j) PHold = 1;
-    else PHold = 0;
-  } else {
-    if(i + k >= (goal + error) / 50) PHold = 1;
-    else if(i + k >= goal / 50) PHold = 1 - lookupChance((i + k - j) + 1, diceNum - 1); // get the opponents chance of passing you
-    else PHold = 1 - P[j][i + k][0][diceNum - 1];
-  }
-
-  float PRoll;
-  if(j >= goal / 50) {
-    PRoll = lookupChance((j - i - k) + 1, d);
-  } else
-    PRoll = getRollPossabilities(P, i, j, k, d);
-  
-  if(PHold > PRoll)
-    return false;
-  else
-    return true;
-}
-
-float ProbabilityTable::max(float a, float b) {
-  if(a >= b)
-    return a;
-  else
-    return b;
-}
-
-float ProbabilityTable::lookup(float P[(goal + error) / 50][(goal + error) / 50][error / 50][diceNum], int i, int j, int k, int d) {
+float ChanceTable::lookup(float P[error / 50][diceNum], int k, int d) {
   d = normalize(d);
-  if(i + k >= (goal + error) / 50) return 1.0;
-  return P[i][j][k][d];
-}
-
-float ProbabilityTable::lookupChance(int k, int d) {
-  if(k * 50 >= error) return 0.0;
-  else if(k <= 0) return 1.0;
-  return chanceOfReachingAValue[k][d];
+  if(k >= goal / 50) return 1.0;
+  return P[k][d];
 }
 
 // This is to reset the dice back to 3 when the one is rolled 
-int ProbabilityTable::normalize(int num) {
+int ChanceTable::normalize(int num) {
   if(num < 0)
     return diceNum - 1;
   return num;
 }
 
-std::vector<struct roll> ProbabilityTable::getRollChoices(std::vector<int> pastRolls) {
+std::vector<struct roll> ChanceTable::getRollChoices(std::vector<int> pastRolls) {
   std::vector<struct roll> choices;
 
   // First get the counts for all dice
@@ -89,24 +53,6 @@ std::vector<struct roll> ProbabilityTable::getRollChoices(std::vector<int> pastR
       struct roll toAdd;
       toAdd.roll = 750 / 50;
       toAdd.diceNum = 6;
-      choices.push_back(toAdd);
-    }
-
-    // Check for two triples 
-    int tripleCount = 0;
-    for(int i = 0; i < 6; i++)
-      if(rollcounts[i] == 3)
-        ++tripleCount;
-    if(tripleCount == 2) {
-      struct roll toAdd;
-      toAdd.diceNum = 6;
-      for(int i = 0; i < 6; i++)
-        if(rollcounts[i] == 3) {
-          if(i == 0)
-            toAdd.roll += 1000;
-          else
-            toAdd.roll += (i + 1) * 100;
-        }
       choices.push_back(toAdd);
     }
   }
@@ -186,7 +132,7 @@ std::vector<struct roll> ProbabilityTable::getRollChoices(std::vector<int> pastR
 }
 
 // This just gets the average probability of winning if you roll
-float ProbabilityTable::getRollPossabilities(float P[(goal + error) / 50][(goal + error) / 50][error / 50][diceNum], int i, int j, int k, int d) {
+float ChanceTable::getRollPossabilities(float P[error / 50][diceNum], int k, int d) {
   float probabilitiesAddedUp = 0;
   float divideBy = 0;
 
@@ -197,13 +143,12 @@ float ProbabilityTable::getRollPossabilities(float P[(goal + error) / 50][(goal 
       if(oneDie[a].choices.size() > 0) {
         float maxProbability = 0;
         for(int b = 0; b < oneDie[a].choices.size(); b++) {
-          float p = lookup(P, i, j, k + oneDie[a].choices[b].roll, d - oneDie[a].choices[b].diceNum);
+          float p = lookup(P, k + oneDie[a].choices[b].roll, d - oneDie[a].choices[b].diceNum);
           if(p > maxProbability)
             maxProbability = p;
         }
         probabilitiesAddedUp += maxProbability * oneDie[a].combinationsPossible;
-      } else
-        probabilitiesAddedUp += (1 - lookup(P, j, i, 0, diceNum - 1)) * oneDie[a].combinationsPossible;
+      }
     }
   } else if(d == 1) {
     for(int a = 0; a < twoDie.size(); a++) {
@@ -212,13 +157,12 @@ float ProbabilityTable::getRollPossabilities(float P[(goal + error) / 50][(goal 
       if(twoDie[a].choices.size() > 0) {
         float maxProbability = 0;
         for(int b = 0; b < twoDie[a].choices.size(); b++) {
-          float p = lookup(P, i, j, k + twoDie[a].choices[b].roll, d - twoDie[a].choices[b].diceNum);
+          float p = lookup(P, k + twoDie[a].choices[b].roll, d - twoDie[a].choices[b].diceNum);
           if(p > maxProbability)
             maxProbability = p;
         }
         probabilitiesAddedUp += maxProbability * twoDie[a].combinationsPossible;
-      } else
-        probabilitiesAddedUp += (1 - lookup(P, j, i, 0, diceNum - 1)) * twoDie[a].combinationsPossible;
+      }
     }
   } else if(d == 2) {
     for(int a = 0; a < threeDie.size(); a++) {
@@ -226,13 +170,12 @@ float ProbabilityTable::getRollPossabilities(float P[(goal + error) / 50][(goal 
       if(threeDie[a].choices.size() > 0) {
         float maxProbability = 0;
         for(int b = 0; b < threeDie[a].choices.size(); b++) {
-          float p = lookup(P, i, j, k + threeDie[a].choices[b].roll, d - threeDie[a].choices[b].diceNum);
+          float p = lookup(P, k + threeDie[a].choices[b].roll, d - threeDie[a].choices[b].diceNum);
           if(p > maxProbability)
             maxProbability = p;
         }
         probabilitiesAddedUp += maxProbability * threeDie[a].combinationsPossible;
-      } else
-        probabilitiesAddedUp += (1 - lookup(P, j, i, 0, diceNum - 1)) * threeDie[a].combinationsPossible;
+      }
     }
   } else if(d == 3) {
     for(int a = 0; a < fourDie.size(); a++) {
@@ -240,13 +183,12 @@ float ProbabilityTable::getRollPossabilities(float P[(goal + error) / 50][(goal 
       if(fourDie[a].choices.size() > 0) {
         float maxProbability = 0;
         for(int b = 0; b < fourDie[a].choices.size(); b++) {
-          float p = lookup(P, i, j, k + fourDie[a].choices[b].roll, d - fourDie[a].choices[b].diceNum);
+          float p = lookup(P, k + fourDie[a].choices[b].roll, d - fourDie[a].choices[b].diceNum);
           if(p > maxProbability)
             maxProbability = p;
         }
         probabilitiesAddedUp += maxProbability * fourDie[a].combinationsPossible;
-      } else
-        probabilitiesAddedUp += (1 - lookup(P, j, i, 0, diceNum - 1)) * fourDie[a].combinationsPossible;
+      }
     }
   } else if(d == 4) {
     for(int a = 0; a < fiveDie.size(); a++) {
@@ -254,13 +196,12 @@ float ProbabilityTable::getRollPossabilities(float P[(goal + error) / 50][(goal 
       if(fiveDie[a].choices.size() > 0) {
         float maxProbability = 0;
         for(int b = 0; b < fiveDie[a].choices.size(); b++) {
-          float p = lookup(P, i, j, k + fiveDie[a].choices[b].roll, d - fiveDie[a].choices[b].diceNum);
+          float p = lookup(P, k + fiveDie[a].choices[b].roll, d - fiveDie[a].choices[b].diceNum);
           if(p > maxProbability)
             maxProbability = p;
         }
         probabilitiesAddedUp += maxProbability * fiveDie[a].combinationsPossible;
-      } else
-        probabilitiesAddedUp += (1 - lookup(P, j, i, 0, diceNum - 1)) * fiveDie[a].combinationsPossible;
+      }
     }
   } else if(d == 5) {
     for(int a = 0; a < sixDie.size(); a++) {
@@ -268,30 +209,20 @@ float ProbabilityTable::getRollPossabilities(float P[(goal + error) / 50][(goal 
       if(sixDie[a].choices.size() > 0) {
         float maxProbability = 0;
         for(int b = 0; b < sixDie[a].choices.size(); b++) {
-          float p = lookup(P, i, j, k + sixDie[a].choices[b].roll, d - sixDie[a].choices[b].diceNum);
+          float p = lookup(P, k + sixDie[a].choices[b].roll, d - sixDie[a].choices[b].diceNum);
           if(p > maxProbability)
             maxProbability = p;
         }
         probabilitiesAddedUp += maxProbability * sixDie[a].combinationsPossible;
-      } else
-        probabilitiesAddedUp += (1 - lookup(P, j, i, 0, diceNum - 1)) * sixDie[a].combinationsPossible;
+      }
     }
   }
 
   return probabilitiesAddedUp / divideBy;
 }
 
-ProbabilityTable::ProbabilityTable() {
-  // Get the chance of reaching a given score in one turn 
-  std::cout << "Calculating probabilities of reaching different scores\n";
-  for(int i = 0; i < error / 50; i++) {
-    ChanceTable table(i * 50);
-    for(int j = 0; j < diceNum; j++) {
-      chanceOfReachingAValue[i][j] = table.getProbability(j + 1);
-      std::cout << "Score: " << i * 50 << " | Starting Dice: " << j << '\n';
-    }
-  }
-  std::cout << '\n';
+ChanceTable::ChanceTable(int goalPar) {
+  goal = goalPar;
 
   // First get all the roll scores
   std::vector<int> pastRolls;
@@ -498,63 +429,32 @@ ProbabilityTable::ProbabilityTable() {
             }
 
   // Every possability i, j, k  and set it at 0.5(this is arbitrary)
-  for(int i = 0; i < (goal + error) / 50; i++)
-    for(int j = 0; j < (goal + error) / 50; j++)
-      for(int k = 0; k < error / 50; k++)
-        for(int d = 0; d < diceNum; d++)
-          P[i][j][k][d] = 0.5;
+  for(int k = 0; k < error / 50; k++)
+      for(int d = 0; d < diceNum; d++)
+        P[k][d] = 0.5;
 
-  int partitionTotal = ((goal + error) / 50 - 1) * 2;
+  int partitionTotal = (error / 50 - 1) * 2;
   while(partitionTotal >= 0) {
     while(1) {
       float maxChange = 0;
 
-      for(int i = 0; i < (goal + error) / 50; i++)
-        for(int j = 0; j < (goal + error) / 50; j++)
-          if(i + j == partitionTotal)
-            for(int k = 0; k < error / 50; k++)
-              for(int d = 0; d < diceNum; d++)
-                old[i][j][k][d] = P[i][j][k][d];
+      for(int k = 0; k < error / 50; k++)
+        for(int d = 0; d < diceNum; d++)
+            old[k][d] = P[k][d];
 
-      for(int i = 0; i < (goal + error) / 50; i++)
-        for(int j = 0; j < (goal + error) / 50; j++)
-          if(i + j == partitionTotal)
-            for(int k = 0; k < error / 50; k++)
-              for(int d = 0; d < diceNum; d++){
-                float PHold;
-                if(j >= goal / 50) {
-                  if (i + k > j) PHold = 1;
-                  else PHold = 0;
-                } else {
-                  if(i + k >= (goal + error) / 50) PHold = 1;
-                  else if(i + k >= goal / 50) PHold = 1 - lookupChance((i + k - j) + 1, diceNum - 1); // ge the opponents chance of passing you
-                  else PHold = 1 - P[j][i + k][0][diceNum - 1];
-                }
+      for(int k = 0; k < error / 50; k++)
+        for(int d = 0; d < diceNum; d++)
+          P[k][d] = getRollPossabilities(P, k, d);
 
-                float PRoll;
-                if(j >= goal / 50) {
-                  if(i + k > j) PRoll = 1;
-                  else PRoll = lookupChance(j - i - k + 1, d);
-                } else
-                  PRoll = getRollPossabilities(P, i, j, k, d);
-
-                P[i][j][k][d] = max(PHold, PRoll);
-              }
-
-      for(int i = 0; i < (goal + error) / 50; i++)
-        for(int j = 0; j < (goal + error) / 50; j++)
-          if(i + j == partitionTotal)
-            for(int k = 0; k < error / 50; k++)
-              for(int d = 0; d < diceNum; d++) {
-                float change = std::fabs(old[i][j][k][d] - P[i][j][k][d]);
-                if(change > maxChange)
-                  maxChange = change;
-              }
+      for(int k = 0; k < error / 50; k++)
+        for(int d = 0; d < diceNum; d++) {
+          float change = std::fabs(old[k][d] - P[k][d]);
+          if(change > maxChange)
+            maxChange = change;
+        }
       if(maxChange <= epsilon)
         break;
     }
-
-    std::cout << partitionTotal * 50 << '\n';
     --partitionTotal;
   }
 }
